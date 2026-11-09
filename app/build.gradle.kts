@@ -71,9 +71,10 @@ android {
             useSupportLibrary = true
         }
 
-        // Support all architectures for maximum device compatibility
+        // Branch-only: arm64-v8a only, to match the splits below. Revert before
+        // merging to main: the release ships every ABI plus universal.
         ndk {
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+            abiFilters.addAll(listOf("arm64-v8a"))
         }
     }
 
