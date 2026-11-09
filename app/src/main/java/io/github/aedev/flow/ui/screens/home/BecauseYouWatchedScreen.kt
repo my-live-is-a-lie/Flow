@@ -54,7 +54,9 @@ fun BecauseYouWatchedScreen(
     val latestState by rememberUpdatedState(uiState)
     LaunchedEffect(listState) {
         snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+            listState.layoutInfo.visibleItemsInfo
+                .lastOrNull()
+                ?.index
         }.collect { index ->
             val state = latestState
             if (index != null && state.hasMore && !state.isLoading && !state.isLoadingMore &&
@@ -84,7 +86,9 @@ fun BecauseYouWatchedScreen(
                     .padding(paddingValues),
         ) {
             when {
-                uiState.isLoading -> FlowLoadingIndicator()
+                uiState.isLoading -> {
+                    FlowLoadingIndicator()
+                }
 
                 uiState.videos.isEmpty() -> {
                     FlowEmptyState(
