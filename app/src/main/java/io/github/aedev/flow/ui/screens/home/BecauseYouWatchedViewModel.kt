@@ -194,6 +194,5 @@ class BecauseYouWatchedViewModel
             return mergeRelatedRoundRobin(perSeed, seedIds + excludeIds, maxPerSeed = BECAUSE_YOU_WATCHED_PER_SEED)
         }
 
-        private suspend fun cacheFilters(): HomeFeedCacheFilters =
-            HomeFeedCacheFilters(exclusions = FlowNeuroEngine.feedExclusions())
+        private suspend fun cacheFilters(): HomeFeedCacheFilters = HomeFeedCacheFilters(exclusions = FlowNeuroEngine.feedExclusions())
     }
