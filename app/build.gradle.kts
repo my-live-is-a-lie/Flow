@@ -71,11 +71,10 @@ android {
             useSupportLibrary = true
         }
 
-        // Branch-only: arm64-v8a only, to match the splits below. Revert before
-        // merging to main: the release ships every ABI plus universal.
-        ndk {
-            abiFilters.addAll(listOf("arm64-v8a"))
-        }
+        // Branch-only: the ndk abiFilters block was removed — AGP forbids
+        // ndk abiFilters together with splits abi filters, even when they
+        // agree. The arm64-only splits below determine the APK ABIs.
+        // Revert before merging to main: restore the four-ABI filters.
     }
 
     dependenciesInfo {
