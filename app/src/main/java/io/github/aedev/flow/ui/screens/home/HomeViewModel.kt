@@ -71,6 +71,7 @@ import javax.inject.Inject
 private data class Wave1FeedResults(
     val discovery: List<Pair<String, List<Video>>>,
     val related: RelatedGraphFetchResult,
+    val becauseYouWatched: BecauseYouWatchedLane?,
 )
 
 /** Cards a load-more attempt found but did not show yet, with why each is there. */
@@ -114,6 +115,8 @@ class HomeViewModel
             private const val TAG = "HomeViewModel"
             private const val UI_STATE_SUBSCRIPTION_TIMEOUT_MS = 5_000L
             private const val MAX_RELATED_SEEDS = 4
+            private const val BECAUSE_YOU_WATCHED_SEEDS = 3
+            private const val BECAUSE_YOU_WATCHED_MAX_VIDEOS = 15
             private const val MIN_PAGE_SIZE = 8
             private const val LOAD_MORE_GRAPH_SEEDS = 3
 
@@ -613,9 +616,48 @@ class HomeViewModel
                                             feedSources.fetchRelatedGraph(seedInputs + longTermInputs, seedIds, ::cacheFilters)
                                         }
 
+                                    // ── Because-you-watched lane: the /next lists of the three most
+                                    // recent watches, merged round-robin so no single seed dominates.
+                                    // The fetches go through the same cached related lookup as the
+                                    // graph lane, so a seed both lanes use is fetched once.
+                                    val deferredBecauseYouWatched =
+                                        async {
+                                            val seeds =
+                                                feedSources.historySeedInputs().take(BECAUSE_YOU_WATCHED_SEEDS)
+                                            if (seeds.isEmpty()) return@async null
+                                            val seedIds = seeds.map { it.id }.toSet()
+                                            val perSeed =
+                                                seeds.map { seed ->
+                                                    async {
+                                                        feedSources.relatedVideos(seed.id, ::cacheFilters)
+                                                            .filterNot { it.id in seedIds }
+                                                    }
+                                                }.awaitAll()
+                                            val seen = HashSet<String>()
+                                            val videos = ArrayList<Video>()
+                                            var index = 0
+                                            while (videos.size < BECAUSE_YOU_WATCHED_MAX_VIDEOS) {
+                                                var added = false
+                                                for (list in perSeed) {
+                                                    if (videos.size >= BECAUSE_YOU_WATCHED_MAX_VIDEOS) break
+                                                    val video = list.getOrNull(index) ?: continue
+                                                    if (seen.add(video.id)) {
+                                                        videos.add(video)
+                                                        added = true
+                                                    }
+                                                }
+                                                if (!added) break
+                                                index++
+                                            }
+                                            videos.takeIf { it.isNotEmpty() }?.let {
+                                                BecauseYouWatchedLane(videos = it)
+                                            }
+                                        }
+
                                     Wave1FeedResults(
                                         discovery = deferredDiscovery.await(),
                                         related = deferredRelated.await(),
+                                        becauseYouWatched = deferredBecauseYouWatched.await(),
                                     )
                                 }
                             }
@@ -624,6 +666,7 @@ class HomeViewModel
                         val rawDiscovery = discoveryPairs.flatMap { it.second }
                         val relatedFetch = results.related
                         val rawRelated = relatedFetch.candidates
+                        val becauseYouWatched = results.becauseYouWatched
 
                         // Stale-query feedback: queries whose results are mostly
                         // already-shown get skipped by the next generation cycle.
@@ -805,6 +848,7 @@ class HomeViewModel
                                     loadMoreFailed = false,
                                     isFlowFeed = true,
                                     lastRefreshTime = now,
+                                    becauseYouWatched = becauseYouWatched,
                                 )
                             if (holdBack) {
                                 settled.copy(pendingFeed = HomePendingFeed(visibleFeed, rankedShorts ?: state.shorts, origins))

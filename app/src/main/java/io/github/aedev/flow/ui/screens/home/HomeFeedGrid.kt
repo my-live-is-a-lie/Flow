@@ -54,12 +54,19 @@ internal fun HomeFeedGrid(
     val videos = uiState.videos
     val channelMemoryReason = stringResource(R.string.home_reason_channel_memory)
     val rows =
-        remember(videos, feedLayout.columns, uiState.continueWatchingVideos.isNotEmpty(), showShorts && uiState.shorts.isNotEmpty()) {
+        remember(
+            videos,
+            feedLayout.columns,
+            uiState.continueWatchingVideos.isNotEmpty(),
+            showShorts && uiState.shorts.isNotEmpty(),
+            uiState.becauseYouWatched != null,
+        ) {
             homeFeedRows(
                 videos = videos,
                 columns = feedLayout.columns,
                 showContinueWatching = uiState.continueWatchingVideos.isNotEmpty(),
                 showShorts = showShorts && uiState.shorts.isNotEmpty(),
+                showBecauseYouWatched = uiState.becauseYouWatched != null,
             )
         }
     val plan =
@@ -106,6 +113,17 @@ internal fun HomeFeedGrid(
                         whyShown = uiState.origins[row.video.id]?.label(),
                         modifier = Modifier.testTag("home_video_card"),
                     )
+                }
+
+                HomeFeedRow.BecauseYouWatched -> {
+                    uiState.becauseYouWatched?.let { lane ->
+                        BecauseYouWatchedShelf(
+                            lane = lane,
+                            onVideoClick = onVideoClick,
+                            cardWidth = stripCardWidth,
+                            modifier = Modifier.testTag("home_because_you_watched_shelf"),
+                        )
+                    }
                 }
 
                 HomeFeedRow.ContinueWatching -> {

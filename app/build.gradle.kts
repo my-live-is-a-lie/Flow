@@ -86,10 +86,12 @@ android {
 
     splits {
         abi {
+            // Branch-only: arm64-v8a release builds only, to keep CI fast. Revert
+            // before merging to main: the release ships every ABI plus universal.
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-            isUniversalApk = true
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
 
