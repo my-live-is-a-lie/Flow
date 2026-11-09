@@ -178,6 +178,10 @@ class HomeViewModel
         private var channelMemoryJob: Job? = null
         private var neighbourJob: Job? = null
         private var visibleMetadataJob: Job? = null
+        private var laneRefreshJob: Job? = null
+
+        /** Newest history entry the lane was built from; a different one means a video was watched. */
+        private var laneSeedHeadId: String? = null
 
         // Changes with every feed load, so work cancelled by leaving Home can tell it from a reload.
         @Volatile
@@ -302,6 +306,12 @@ class HomeViewModel
                                 state.copy(
                                     videos = state.videos.filter { it.id != event.videoId },
                                     shorts = state.shorts.filter { it.id != event.videoId },
+                                    becauseYouWatched =
+                                        state.becauseYouWatched?.let { lane ->
+                                            lane
+                                                .copy(videos = lane.videos.filter { it.id != event.videoId })
+                                                .takeIf { it.videos.isNotEmpty() }
+                                        },
                                 )
                             }
                             // Full clear — topic signals changed, discovery queries will differ
@@ -350,6 +360,54 @@ class HomeViewModel
                     feedReady = state.isReadyForPrefetch(),
                 ),
             )
+            refreshBecauseYouWatchedIfNeeded()
+        }
+
+        /**
+         * The lane's seeds are the most recent watches, so a video opened since the lane was built
+         * changes the newest seed. Rebuild the lane — and only the lane — when Home becomes
+         * visible again, so the just-watched video's suggestions are already there.
+         */
+        private fun refreshBecauseYouWatchedIfNeeded() {
+            if (_uiState.value.isLoading || laneRefreshJob?.isActive == true) return
+            laneRefreshJob =
+                viewModelScope.launch(PerformanceDispatcher.networkIO) {
+                    val headId =
+                        runCatching { feedSources.historySeedInputs().firstOrNull()?.id }
+                            .getOrNull()
+                    if (headId.isNullOrBlank() || headId == laneSeedHeadId) return@launch
+                    runCatching { fetchBecauseYouWatched(forceRefresh = true) }
+                        .onSuccess { lane ->
+                            _uiState.update { state -> state.copy(becauseYouWatched = lane) }
+                        }
+                }
+        }
+
+        // The /next lists of the five most recent watches, three suggestions each, merged
+        // round-robin so no single seed dominates. A reload re-fetches the seeds fresh, so the
+        // lane shows new suggestions instead of the cached lists.
+        private suspend fun fetchBecauseYouWatched(forceRefresh: Boolean): BecauseYouWatchedLane? {
+            val seeds = feedSources.historySeedInputs().take(BECAUSE_YOU_WATCHED_SEEDS)
+            if (seeds.isEmpty()) return null
+            laneSeedHeadId = seeds.first().id
+            val seedIds = seeds.map { it.id }.toSet()
+            val perSeed =
+                coroutineScope {
+                    seeds
+                        .map { seed ->
+                            async {
+                                feedSources.relatedVideos(seed.id, ::cacheFilters, forceRefresh)
+                            }
+                        }.awaitAll()
+                }
+            val videos =
+                mergeRelatedRoundRobin(
+                    perSeed,
+                    seedIds,
+                    BECAUSE_YOU_WATCHED_MAX_VIDEOS,
+                    BECAUSE_YOU_WATCHED_PER_SEED,
+                )
+            return videos.takeIf { it.isNotEmpty() }?.let { BecauseYouWatchedLane(videos = it) }
         }
 
         fun onHomeHidden() {
@@ -360,6 +418,7 @@ class HomeViewModel
 
             wave2Job?.cancel()
             savedInterestJob?.cancel()
+            laneRefreshJob?.cancel()
             _uiState.update { it.copy(isLoadingMore = false) }
         }
 
@@ -615,36 +674,8 @@ class HomeViewModel
                                             feedSources.fetchRelatedGraph(seedInputs + longTermInputs, seedIds, ::cacheFilters)
                                         }
 
-                                    // ── Because-you-watched lane: the /next lists of the five most
-                                    // recent watches, three suggestions each, merged round-robin so
-                                    // no single seed dominates.
-                                    // A reload re-fetches the seeds fresh, so the lane shows new
-                                    // suggestions instead of the cached lists.
                                     val deferredBecauseYouWatched =
-                                        async {
-                                            val seeds =
-                                                feedSources.historySeedInputs().take(BECAUSE_YOU_WATCHED_SEEDS)
-                                            if (seeds.isEmpty()) return@async null
-                                            val seedIds = seeds.map { it.id }.toSet()
-                                            val perSeed =
-                                                seeds
-                                                    .map { seed ->
-                                                        async {
-                                                            feedSources
-                                                                .relatedVideos(seed.id, ::cacheFilters, forceRefresh)
-                                                        }
-                                                    }.awaitAll()
-                                            val videos =
-                                                mergeRelatedRoundRobin(
-                                                    perSeed,
-                                                    seedIds,
-                                                    BECAUSE_YOU_WATCHED_MAX_VIDEOS,
-                                                    BECAUSE_YOU_WATCHED_PER_SEED,
-                                                )
-                                            videos.takeIf { it.isNotEmpty() }?.let {
-                                                BecauseYouWatchedLane(videos = it)
-                                            }
-                                        }
+                                        async { fetchBecauseYouWatched(forceRefresh) }
 
                                     Wave1FeedResults(
                                         discovery = deferredDiscovery.await(),

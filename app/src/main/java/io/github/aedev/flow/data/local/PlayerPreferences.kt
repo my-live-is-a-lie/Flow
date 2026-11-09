@@ -268,6 +268,9 @@ class PlayerPreferences(
         val SUBS_SELECTED_GROUP = stringPreferencesKey("subs_selected_group")
         val SUBS_REFRESH_ON_STARTUP = booleanPreferencesKey("subs_refresh_on_startup")
         val SUBS_LAST_REFRESH_TIME = longPreferencesKey("subs_last_refresh_time")
+
+        // Because-you-watched page view mode
+        val BECAUSE_YOU_WATCHED_FULL_WIDTH_VIEW = booleanPreferencesKey("because_you_watched_full_width_view")
         val SUBS_LAST_REFRESHED_COUNT = intPreferencesKey("subs_last_refreshed_count")
         val SUBS_SHOW_CHECKED_VIDEO_COUNT = booleanPreferencesKey("subs_show_checked_video_count")
         val SHOW_CHANNEL_GROUP_BADGES = booleanPreferencesKey("show_channel_group_badges")
@@ -2835,6 +2838,19 @@ class PlayerPreferences(
     suspend fun setSubsFullWidthView(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.SUBS_FULL_WIDTH_VIEW] = enabled
+        }
+    }
+
+    // Because-you-watched page view mode
+    val becauseYouWatchedFullWidthView: Flow<Boolean> =
+        context.playerPreferencesDataStore.data
+            .map { preferences ->
+                preferences[Keys.BECAUSE_YOU_WATCHED_FULL_WIDTH_VIEW] ?: false
+            }
+
+    suspend fun setBecauseYouWatchedFullWidthView(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.BECAUSE_YOU_WATCHED_FULL_WIDTH_VIEW] = enabled
         }
     }
 

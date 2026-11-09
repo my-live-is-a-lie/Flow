@@ -3,8 +3,11 @@ package io.github.aedev.flow.ui.screens.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.aedev.flow.data.engagement.FeedInvalidationBus
 import io.github.aedev.flow.data.local.HomeFeedCacheFilters
+import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.model.Video
+import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.data.recommendation.GraphSeedInput
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.Job
@@ -27,6 +30,7 @@ data class BecauseYouWatchedUiState(
     val isLoadingMore: Boolean = false,
     val isRefreshing: Boolean = false,
     val hasMore: Boolean = false,
+    val isFullWidthView: Boolean = false,
 )
 
 /**
@@ -39,6 +43,7 @@ class BecauseYouWatchedViewModel
     @Inject
     constructor(
         private val feedSources: HomeFeedSources,
+        private val playerPreferences: PlayerPreferences,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(BecauseYouWatchedUiState(isLoading = true))
         val uiState: StateFlow<BecauseYouWatchedUiState> = _uiState.asStateFlow()
@@ -47,6 +52,55 @@ class BecauseYouWatchedViewModel
         private var pool: List<Video> = emptyList()
         private var seedCursor = 0
         private var loadJob: Job? = null
+
+        init {
+            viewModelScope.launch(PerformanceDispatcher.diskIO) {
+                playerPreferences.becauseYouWatchedFullWidthView.collect { fullWidth ->
+                    _uiState.update { it.copy(isFullWidthView = fullWidth) }
+                }
+            }
+            // A dismissal from a card menu lands here too, so the video leaves the page at once;
+            // the persisted exclusion keeps it out of every later rebuild.
+            viewModelScope.launch {
+                FeedInvalidationBus.events.collect { event ->
+                    when (event) {
+                        is FeedInvalidationBus.Event.NotInterested -> dropVideo(event.videoId)
+                        is FeedInvalidationBus.Event.ChannelBlocked -> dropChannel(event.channelId)
+                        else -> Unit
+                    }
+                }
+            }
+        }
+
+        fun toggleViewMode() {
+            val newValue = !_uiState.value.isFullWidthView
+            _uiState.update { it.copy(isFullWidthView = newValue) }
+            viewModelScope.launch(PerformanceDispatcher.diskIO) {
+                playerPreferences.setBecauseYouWatchedFullWidthView(newValue)
+            }
+        }
+
+        private fun dropVideo(videoId: String) {
+            pool = pool.filter { it.id != videoId }
+            _uiState.update { state ->
+                val videos = state.videos.filter { it.id != videoId }
+                state.copy(
+                    videos = videos,
+                    hasMore = videos.size < pool.size || seedCursor < seeds.size,
+                )
+            }
+        }
+
+        private fun dropChannel(channelId: String) {
+            pool = pool.filter { it.channelId != channelId }
+            _uiState.update { state ->
+                val videos = state.videos.filter { it.channelId != channelId }
+                state.copy(
+                    videos = videos,
+                    hasMore = videos.size < pool.size || seedCursor < seeds.size,
+                )
+            }
+        }
 
         fun loadInitial() {
             if (loadJob?.isActive == true || _uiState.value.videos.isNotEmpty()) return
@@ -140,5 +194,6 @@ class BecauseYouWatchedViewModel
             return mergeRelatedRoundRobin(perSeed, seedIds + excludeIds, maxPerSeed = BECAUSE_YOU_WATCHED_PER_SEED)
         }
 
-        private fun cacheFilters(): HomeFeedCacheFilters = HomeFeedCacheFilters()
+        private suspend fun cacheFilters(): HomeFeedCacheFilters =
+            HomeFeedCacheFilters(exclusions = FlowNeuroEngine.feedExclusions())
     }

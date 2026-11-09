@@ -1,16 +1,20 @@
 package io.github.aedev.flow.ui.screens.home
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -27,12 +31,15 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.ui.components.layout.flowBottomContentPadding
 import io.github.aedev.flow.ui.components.layout.topbar.FlowTopBar
+import io.github.aedev.flow.ui.components.rememberFeedGridLayout
+import io.github.aedev.flow.ui.components.shared.FeedGridTopPadding
 import io.github.aedev.flow.ui.components.shared.FlowEmptyState
 import io.github.aedev.flow.ui.components.shared.FlowFeedProgress
 import io.github.aedev.flow.ui.components.shared.FlowLoadingIndicator
 import io.github.aedev.flow.ui.components.shared.FlowPullToRefreshBox
 import io.github.aedev.flow.ui.components.shared.card.MediaVideoCard
 import io.github.aedev.flow.ui.components.shared.card.VideoCardLayout
+import io.github.aedev.flow.ui.components.shared.rememberFeedGridPlan
 
 private const val LOAD_MORE_THRESHOLD = 5
 
@@ -45,16 +52,16 @@ fun BecauseYouWatchedScreen(
     viewModel: BecauseYouWatchedViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
 
     LaunchedEffect(viewModel) {
         viewModel.loadInitial()
     }
 
     val latestState by rememberUpdatedState(uiState)
-    LaunchedEffect(listState) {
+    LaunchedEffect(gridState) {
         snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo
+            gridState.layoutInfo.visibleItemsInfo
                 .lastOrNull()
                 ?.index
         }.collect { index ->
@@ -73,6 +80,15 @@ fun BecauseYouWatchedScreen(
             FlowTopBar(
                 title = stringResource(R.string.home_because_you_watched),
                 onBack = onBackClick,
+                actions = {
+                    IconButton(onClick = { viewModel.toggleViewMode() }) {
+                        Icon(
+                            imageVector =
+                                if (uiState.isFullWidthView) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
+                            contentDescription = stringResource(R.string.toggle_view_mode),
+                        )
+                    }
+                },
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -100,28 +116,48 @@ fun BecauseYouWatchedScreen(
                 }
 
                 else -> {
-                    LazyColumn(
-                        state = listState,
-                        contentPadding =
-                            PaddingValues(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = 8.dp,
-                                bottom = flowBottomContentPadding(),
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(uiState.videos, key = { it.id }) { video ->
-                            MediaVideoCard(
-                                video = video,
-                                layout = VideoCardLayout.Row,
-                                onClick = { onVideoClick(video) },
-                                modifier = Modifier.fillMaxWidth(),
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val feedLayout = rememberFeedGridLayout(maxWidth)
+                        val plan =
+                            rememberFeedGridPlan(
+                                layout = feedLayout,
+                                listMode = uiState.isFullWidthView,
+                                itemCount = uiState.videos.size,
+                                spansOwnRow = { false },
+                                includeLastRun = true,
+                                itemsKey = uiState.videos,
+                                compactRowSpacing = 12.dp,
                             )
-                        }
-                        if (uiState.isLoadingMore) {
-                            item(key = "loading_more") {
-                                FlowFeedProgress()
+                        LazyVerticalGrid(
+                            columns = plan.cells,
+                            state = gridState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding =
+                                plan.contentPadding(
+                                    top = FeedGridTopPadding,
+                                    bottom = flowBottomContentPadding(),
+                                ),
+                            verticalArrangement = Arrangement.spacedBy(plan.rowSpacing),
+                        ) {
+                            itemsIndexed(
+                                items = uiState.videos,
+                                key = { _, video -> video.id },
+                                span = { index, _ ->
+                                    plan.span(index, spansOwnRow = false, maxLineSpan = maxLineSpan)
+                                },
+                            ) { index, video ->
+                                MediaVideoCard(
+                                    video = video,
+                                    layout =
+                                        if (plan.isListCard(index)) VideoCardLayout.Row else VideoCardLayout.Stacked,
+                                    onClick = { onVideoClick(video) },
+                                    thumbnailWidth = plan.listThumbnailWidth,
+                                )
+                            }
+                            if (uiState.isLoadingMore) {
+                                item(key = "loading_more", span = { GridItemSpan(maxLineSpan) }) {
+                                    FlowFeedProgress()
+                                }
                             }
                         }
                     }

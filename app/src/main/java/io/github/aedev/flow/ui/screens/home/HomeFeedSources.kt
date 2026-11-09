@@ -173,7 +173,9 @@ class HomeFeedSources
 
         /**
          * A viewer-initiated reload passes [forceRefresh] to skip both caches, so the lane shows
-         * fresh suggestions instead of the lists the last load stored.
+         * fresh suggestions instead of the lists the last load stored. Every list is filtered by
+         * the current exclusions, so a video marked not interested never comes back from the
+         * memory cache or a fresh fetch either; the Room path already filters the same way.
          */
         private suspend fun fetchRelatedVideos(
             seedId: String,
@@ -181,12 +183,17 @@ class HomeFeedSources
             forceRefresh: Boolean = false,
         ): List<Video> {
             val ts = System.currentTimeMillis()
+            val resolvedFilters = filters()
             if (!forceRefresh) {
-                relatedCache[seedId]?.takeIf { ts - it.ts < RELATED_TTL_MS }?.videos?.let { return it }
+                relatedCache[seedId]?.takeIf { ts - it.ts < RELATED_TTL_MS }?.videos?.let {
+                    return it.filterNot { video ->
+                        resolvedFilters.exclusions.hidesFromRecommendations(video)
+                    }
+                }
 
                 val persisted =
                     runCatching {
-                        homeFeedCache.loadRelated(seedId, filters(), ts)
+                        homeFeedCache.loadRelated(seedId, resolvedFilters, ts)
                     }.getOrElse { emptyList() }
                 if (persisted.isNotEmpty()) {
                     relatedCache[seedId] = CachedRelated(persisted, ts)
@@ -206,6 +213,8 @@ class HomeFeedSources
                     relatedCache[seedId] = CachedRelated(it, ts)
                     homeFeedCache.saveRelated(seedId, it, ts)
                 }
+            }.filterNot { video ->
+                resolvedFilters.exclusions.hidesFromRecommendations(video)
             }
         }
 
