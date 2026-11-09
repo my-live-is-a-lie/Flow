@@ -627,12 +627,14 @@ class HomeViewModel
                                             if (seeds.isEmpty()) return@async null
                                             val seedIds = seeds.map { it.id }.toSet()
                                             val perSeed =
-                                                seeds.map { seed ->
-                                                    async {
-                                                        feedSources.relatedVideos(seed.id, ::cacheFilters)
-                                                            .filterNot { it.id in seedIds }
-                                                    }
-                                                }.awaitAll()
+                                                seeds
+                                                    .map { seed ->
+                                                        async {
+                                                            feedSources
+                                                                .relatedVideos(seed.id, ::cacheFilters)
+                                                                .filterNot { it.id in seedIds }
+                                                        }
+                                                    }.awaitAll()
                                             val seen = HashSet<String>()
                                             val videos = ArrayList<Video>()
                                             var index = 0
