@@ -142,7 +142,8 @@ class HomeFeedSources
         internal suspend fun relatedVideos(
             seedId: String,
             filters: suspend () -> HomeFeedCacheFilters,
-        ): List<Video> = fetchRelatedVideos(seedId, filters)
+            forceRefresh: Boolean = false,
+        ): List<Video> = fetchRelatedVideos(seedId, filters, forceRefresh)
 
         /**
          * Lets the related lists of up to two recent uploads of followed channels, each used once, teach
@@ -170,20 +171,27 @@ class HomeFeedSources
                 }
         }
 
+        /**
+         * A viewer-initiated reload passes [forceRefresh] to skip both caches, so the lane shows
+         * fresh suggestions instead of the lists the last load stored.
+         */
         private suspend fun fetchRelatedVideos(
             seedId: String,
             filters: suspend () -> HomeFeedCacheFilters,
+            forceRefresh: Boolean = false,
         ): List<Video> {
             val ts = System.currentTimeMillis()
-            relatedCache[seedId]?.takeIf { ts - it.ts < RELATED_TTL_MS }?.videos?.let { return it }
+            if (!forceRefresh) {
+                relatedCache[seedId]?.takeIf { ts - it.ts < RELATED_TTL_MS }?.videos?.let { return it }
 
-            val persisted =
-                runCatching {
-                    homeFeedCache.loadRelated(seedId, filters(), ts)
-                }.getOrElse { emptyList() }
-            if (persisted.isNotEmpty()) {
-                relatedCache[seedId] = CachedRelated(persisted, ts)
-                return persisted
+                val persisted =
+                    runCatching {
+                        homeFeedCache.loadRelated(seedId, filters(), ts)
+                    }.getOrElse { emptyList() }
+                if (persisted.isNotEmpty()) {
+                    relatedCache[seedId] = CachedRelated(persisted, ts)
+                    return persisted
+                }
             }
 
             return (

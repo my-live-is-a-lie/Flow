@@ -1,9 +1,11 @@
 package io.github.aedev.flow.ui.screens.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +38,7 @@ internal fun BecauseYouWatchedShelf(
     onVideoClick: (Video) -> Unit,
     cardWidth: Dp,
     modifier: Modifier = Modifier,
+    onSeeAllClick: (() -> Unit)? = null,
 ) {
     if (lane.videos.isEmpty()) return
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -42,6 +46,7 @@ internal fun BecauseYouWatchedShelf(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .then(if (onSeeAllClick != null) Modifier.clickable(onClick = onSeeAllClick) else Modifier)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -57,6 +62,15 @@ internal fun BecauseYouWatchedShelf(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 8.dp),
             )
+            if (onSeeAllClick != null) {
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
         LazyRow(
             modifier = Modifier.dpadFocusGroup(),

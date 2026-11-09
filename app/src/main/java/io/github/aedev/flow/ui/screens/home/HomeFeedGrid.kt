@@ -43,6 +43,7 @@ internal fun HomeFeedGrid(
     onContinueWatchingRemove: (String) -> Unit,
     onShortClick: (List<Video>, Video) -> Unit,
     onSeeAllHistory: () -> Unit,
+    onSeeAllBecauseYouWatched: () -> Unit = {},
     onOpenShortsFeed: () -> Unit,
     onShortsShown: (ids: List<String>) -> Unit,
     onRefresh: () -> Unit,
@@ -122,6 +123,7 @@ internal fun HomeFeedGrid(
                             onVideoClick = onVideoClick,
                             cardWidth = stripCardWidth,
                             modifier = Modifier.testTag("home_because_you_watched_shelf"),
+                            onSeeAllClick = onSeeAllBecauseYouWatched,
                         )
                     }
                 }

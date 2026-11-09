@@ -70,6 +70,7 @@ fun HomeScreen(
     onSearchClick: () -> Unit,
     onOpenSettings: (SettingsTarget) -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
+    onOpenBecauseYouWatched: () -> Unit = {},
     onOpenShortsFeed: () -> Unit = {},
     onPlayMix: (videos: List<Video>, title: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
@@ -201,6 +202,7 @@ fun HomeScreen(
                         onPlayMix = onPlayMix,
                         onShortClick = onShortClick,
                         onNavigateToHistory = onNavigateToHistory,
+                        onOpenBecauseYouWatched = onOpenBecauseYouWatched,
                         onOpenShortsFeed = onOpenShortsFeed,
                     )
                 }

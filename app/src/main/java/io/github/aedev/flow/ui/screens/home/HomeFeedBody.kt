@@ -174,6 +174,7 @@ internal fun HomeFeedBody(
     onPlayMix: (videos: List<Video>, title: String) -> Unit,
     onShortClick: (ShortsQueueSource) -> Unit,
     onNavigateToHistory: () -> Unit,
+    onOpenBecauseYouWatched: () -> Unit = {},
     onOpenShortsFeed: () -> Unit,
     showShorts: Boolean = true,
 ) {
@@ -235,6 +236,7 @@ internal fun HomeFeedBody(
                         onShortClick(viewModel.shortsShelfSource(shelf, tapped))
                     },
                     onSeeAllHistory = onNavigateToHistory,
+                    onSeeAllBecauseYouWatched = onOpenBecauseYouWatched,
                     onOpenShortsFeed = onOpenShortsFeed,
                     onShortsShown = viewModel::recordShelfImpressions,
                     onRefresh = { viewModel.refreshFeed() },

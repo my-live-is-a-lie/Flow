@@ -29,6 +29,7 @@ import io.github.aedev.flow.ui.components.videoplayer.PlayerDraggableState
 import io.github.aedev.flow.ui.screens.channel.ChannelScreen
 import io.github.aedev.flow.ui.screens.equalizer.EqualizerScreen
 import io.github.aedev.flow.ui.screens.history.HistoryScreen
+import io.github.aedev.flow.ui.screens.home.BecauseYouWatchedScreen
 import io.github.aedev.flow.ui.screens.home.HomeScreen
 import io.github.aedev.flow.ui.screens.home.HomeViewModel
 import io.github.aedev.flow.ui.screens.library.LibraryScreen
@@ -110,6 +111,9 @@ fun NavGraphBuilder.flowAppGraph(
             onOpenSettings = { target -> navController.navigate("settings?target=${target.encode()}") },
             onNavigateToHistory = {
                 navController.navigate("history")
+            },
+            onOpenBecauseYouWatched = {
+                navController.navigate("becauseYouWatched")
             },
             onOpenShortsFeed = {
                 navController.openShorts(ShortsQueueSource.Feed)
@@ -468,6 +472,19 @@ fun NavGraphBuilder.flowAppGraph(
             onMusicClick = { track, queue ->
                 musicPlayerViewModel.loadAndPlayTrack(track, queue, "History")
                 onMusicStarted()
+            },
+            onBackClick = { navController.popBackStack() },
+        )
+    }
+
+    // Because You Watched Screen
+    composable("becauseYouWatched") {
+        currentRoute.value = "becauseYouWatched"
+        BecauseYouWatchedScreen(
+            onVideoClick = { video ->
+                navController.openVideoOrShorts(video, disableShortsPlayer) {
+                    playerViewModel.playVideo(it)
+                }
             },
             onBackClick = { navController.popBackStack() },
         )

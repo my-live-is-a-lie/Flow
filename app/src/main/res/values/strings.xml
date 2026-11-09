@@ -4747,6 +4747,8 @@
     <string name="home_origin_related">Related to %1$s</string>
     <string name="home_origin_related_watched">Related to a video you watched</string>
     <string name="home_because_you_watched">Related to videos you watched</string>
+    <string name="because_you_watched_empty">No suggestions yet</string>
+    <string name="because_you_watched_empty_body">Watch a video and videos related to it will show up here.</string>
     <string name="home_origin_search">From a search for %1$s</string>
     <string name="home_origin_search_unnamed">From a search for your interests</string>
     <string name="home_origin_channel_memory">From a channel you often watch</string>

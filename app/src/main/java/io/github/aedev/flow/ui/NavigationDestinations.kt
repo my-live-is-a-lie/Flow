@@ -146,6 +146,7 @@ internal val PAGES_WITH_NAVIGATION_BAR: Set<String> =
         "moodsAndGenres",
         "musicSearch?query={query}",
         "history",
+        "becauseYouWatched",
         DOWNLOADS_ROUTE,
         "localMedia",
         "savedShorts",

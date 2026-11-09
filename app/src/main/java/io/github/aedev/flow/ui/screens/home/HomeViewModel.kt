@@ -115,7 +115,6 @@ class HomeViewModel
             private const val TAG = "HomeViewModel"
             private const val UI_STATE_SUBSCRIPTION_TIMEOUT_MS = 5_000L
             private const val MAX_RELATED_SEEDS = 4
-            private const val BECAUSE_YOU_WATCHED_SEEDS = 3
             private const val BECAUSE_YOU_WATCHED_MAX_VIDEOS = 15
             private const val MIN_PAGE_SIZE = 8
             private const val LOAD_MORE_GRAPH_SEEDS = 3
@@ -616,10 +615,11 @@ class HomeViewModel
                                             feedSources.fetchRelatedGraph(seedInputs + longTermInputs, seedIds, ::cacheFilters)
                                         }
 
-                                    // ── Because-you-watched lane: the /next lists of the three most
-                                    // recent watches, merged round-robin so no single seed dominates.
-                                    // The fetches go through the same cached related lookup as the
-                                    // graph lane, so a seed both lanes use is fetched once.
+                                    // ── Because-you-watched lane: the /next lists of the five most
+                                    // recent watches, three suggestions each, merged round-robin so
+                                    // no single seed dominates.
+                                    // A reload re-fetches the seeds fresh, so the lane shows new
+                                    // suggestions instead of the cached lists.
                                     val deferredBecauseYouWatched =
                                         async {
                                             val seeds =
@@ -631,26 +631,16 @@ class HomeViewModel
                                                     .map { seed ->
                                                         async {
                                                             feedSources
-                                                                .relatedVideos(seed.id, ::cacheFilters)
-                                                                .filterNot { it.id in seedIds }
+                                                                .relatedVideos(seed.id, ::cacheFilters, forceRefresh)
                                                         }
                                                     }.awaitAll()
-                                            val seen = HashSet<String>()
-                                            val videos = ArrayList<Video>()
-                                            var index = 0
-                                            while (videos.size < BECAUSE_YOU_WATCHED_MAX_VIDEOS) {
-                                                var added = false
-                                                for (list in perSeed) {
-                                                    if (videos.size >= BECAUSE_YOU_WATCHED_MAX_VIDEOS) break
-                                                    val video = list.getOrNull(index) ?: continue
-                                                    if (seen.add(video.id)) {
-                                                        videos.add(video)
-                                                        added = true
-                                                    }
-                                                }
-                                                if (!added) break
-                                                index++
-                                            }
+                                            val videos =
+                                                mergeRelatedRoundRobin(
+                                                    perSeed,
+                                                    seedIds,
+                                                    BECAUSE_YOU_WATCHED_MAX_VIDEOS,
+                                                    BECAUSE_YOU_WATCHED_PER_SEED,
+                                                )
                                             videos.takeIf { it.isNotEmpty() }?.let {
                                                 BecauseYouWatchedLane(videos = it)
                                             }
